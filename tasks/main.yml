@@ -1,0 +1,80 @@
+---
+# tasks file for microshift
+# - name: test connection
+#   ping:
+
+- name: add necessary debian packages
+  apt:
+    pkg:
+    - gpg
+
+- name: add gpg signing keys for libcontainers
+  get_url:
+    url:  https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/{{ OS }}/Release.key
+    dest: /tmp/libcontainers-release.key
+
+- name: add gpg signing keys for cri-o repository
+  get_url:
+    url:  https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/{{ CRIO_VERSION_SHORT }}:/{{ CRIO_VERSION_LONG }}/{{ OS }}/Release.key
+    dest: /tmp/crio-release.key
+
+- name: dearmor libcontainer release key
+  command: gpg -o /usr/share/keyrings/libcontainers-archive-keyring.gpg --dearmor /tmp/libcontainers-release.key
+  args:
+    creates: /usr/share/keyrings/libcontainers-archive-keyring.gpg
+
+- name: dearmor cri-o release key
+  command: gpg -o /usr/share/keyrings/libcontainers-crio-archive-keyring.gpg --dearmor /tmp/crio-release.key
+  args:
+    creates: /usr/share/keyrings/libcontainers-crio-archive-keyring.gpg
+
+- name: Add libcontainers package repository
+  apt_repository:
+    repo: >-
+      deb [signed-by=/usr/share/keyrings/libcontainers-archive-keyring.gpg] 
+      https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/{{ OS }}/ /
+    state: present
+    filename: libcontainers
+
+- name: Add cri-o package repository
+  apt_repository:
+    repo:
+      "deb [signed-by=/usr/share/keyrings/libcontainers-crio-archive-keyring.gpg] \
+      http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/\
+      {{ CRIO_VERSION_SHORT }}:/{{ CRIO_VERSION_LONG }}/{{ OS }}/ /"
+    state: present
+    filename: crio
+
+- name: add cri-o and podman container engines
+  apt:
+    pkg:
+    - cri-o
+    - cri-o-runc
+    - containernetworking-plugins
+
+- name: Enable service crio and start it
+  systemd:
+    name: crio
+    enabled: yes
+    state: started
+
+- name: Download crictl inspect tool
+  get_url:
+    url: 
+      "https://github.com/kubernetes-sigs/cri-tools/releases/download/\
+      v{{ CRIO_VERSION_LONG }}/crictl-v{{CRIO_VERSION_LONG}}-linux-amd64.tar.gz"
+    dest: /tmp/crictl.tar.gz
+
+- name: extract crictl
+  unarchive:
+    src: /tmp/crictl.tar.gz
+    dest: /usr/local/sbin/
+    remote_src: yes
+    creates: /usr/local/sbin/crictl
+
+- name: set executable bit to crictl
+  file:
+    path: /usr/local/sbin/crictl
+    mode: 755
+
+  

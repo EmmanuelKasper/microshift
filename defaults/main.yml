@@ -1,0 +1,5 @@
+---
+# defaults file for microshift
+OS: Debian_11
+CRIO_VERSION_SHORT: 1.24
+CRIO_VERSION_LONG: 1.24.1
